@@ -1,85 +1,66 @@
-cmake_minimum_required(VERSION 3.0)
-include(CPack)
+cmake_minimum_required(VERSION 3.10)
 
-project(psp)
+project(jit-jss-tabu-search VERSION 1.0)
 
+# C++ Standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Modules path for CPLEX
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
+# --- Dependencies ---
+
+# CPLEX and its components
 find_package(CPLEX REQUIRED)
-if(CPLEX_FOUND)
-    include_directories(${CPLEX_INCLUDE_DIR})
-    link_directories(${CPLEX_LIBRARY})
-endif()
 
-if(CPLEX_CONCERT_FOUND)
-    include_directories(${CPLEX_CONCERT_INCLUDE_DIR})
-    link_directories(${CPLEX_CONCERT_LIBRARY})
-endif()
+# Boost
+set(Boost_NO_BOOST_CMAKE ON)
+find_package(Boost REQUIRED COMPONENTS program_options timer chrono)
 
-if(CPLEX_ILOCPLEX_FOUND)
-    include_directories(${CPLEX_ILOCPLEX_INCLUDE_DIR})
-    link_directories(${CPLEX_ILOCPLEX_LIBRARY})
-endif()
+# --- Library Target ---
 
-if(CPLEX_CP_FOUND)
-    include_directories(${CPLEX_CP_INCLUDE_DIR})
-    link_directories(${CPLEX_CP_LIBRARY})
-endif()
+# Define the core logic as a library
+add_library(jit_jss_core
+    src/InitialSolution.cpp
+    src/Instance.cpp
+    src/JumpList.cpp
+    src/Neighborhoods.cpp
+    src/Poset.cpp
+    src/Schedulers.cpp
+    src/State.cpp
+    src/Tabu.cpp
+    src/TabuList.cpp
+    src/TabuTrio.cpp
+    src/Utilities.cpp
+)
 
-set(CMAKE_CXX_FLAGS_DEBUG "-g -ggdb -Wall -Wunused -Wno-unknown-pragmas -fPIC -DIL_STD -fexceptions  -std=c++0x ")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native -lm -lpthread -ldl -mtune=native")
+# Target Link Libraries
+target_link_libraries(jit_jss_core PUBLIC 
+    ilocplex
+    cplex-cp
+    ${Boost_LIBRARIES}
+    rt
+    pthread
+    dl
+)
 
-find_package(Boost 1.49.0 COMPONENTS program_options timer system chrono cplex)
+target_include_directories(jit_jss_core PUBLIC src)
 
-add_executable(main main.cpp Instance.cpp State.cpp Tabu.cpp Utilities.cpp Schedulers.cpp InitialSolution.cpp Instance.cpp JumpList.cpp Neighborhoods.cpp Poset.cpp TabuList.cpp TabuTrio.cpp) 
-target_link_libraries(main ${Boost_LIBRARIES} rt cplex-library cplex-concert ilocplex cplex-cp )
+# Compile definitions and flags
+target_compile_definitions(jit_jss_core PUBLIC IL_STD)
+target_compile_options(jit_jss_core PRIVATE -Wall -Wunused -Wno-unknown-pragmas -fPIC -fexceptions)
 
-set(CPACK_PACKAGE_EXECUTABLES "mainIG")
+# --- Executable Target ---
 
-# Add new build types
-message("* Adding build type \"profile\"")
-set(CMAKE_CXX_FLAGS_PROFILE
-    "${GCC_DEBUG_FLAGS} -pg"
-    CACHE STRING "Flags used by the C++ compiler during profile builds."
-    FORCE )
-set(CMAKE_C_FLAGS_PROFILE
-    "${GCC_DEBUG_FLAGS} -pg"
-    CACHE STRING "Flags used by the C compiler during profile builds."
-    FORCE )
-set(CMAKE_EXE_LINKER_FLAGS_PROFILE
-    ""
-    CACHE STRING "Flags used for linking binaries during profile builds."
-    FORCE )
-set(CMAKE_SHARED_LINKER_FLAGS_PROFILE
-    ""
-    CACHE STRING "Flags used by the shared libraries linker during profile builds."
-    FORCE )
-mark_as_advanced(
-    CMAKE_CXX_FLAGS_PROFILE
-    CMAKE_C_FLAGS_PROFILE
-    CMAKE_EXE_LINKER_FLAGS_PROFILE
-    CMAKE_SHARED_LINKER_FLAGS_PROFILE )
+# Main application
+add_executable(main apps/main.cpp)
+target_link_libraries(main PRIVATE jit_jss_core)
 
-# Add new build types
-message("* Adding build type \"optprofile\"")
-set(CMAKE_CXX_FLAGS_OPTPROFILE
-    "-O -g -pg -DNDEBUG"
-    CACHE STRING "Flags used by the C++ compiler during optimized profile builds."
-    FORCE )
-set(CMAKE_C_FLAGS_OPTPROFILE
-    "-O3 -g -pg -DNDEBUG"
-    CACHE STRING "Flags used by the C compiler during optimized profile builds."
-    FORCE )
-set(CMAKE_EXE_LINKER_FLAGS_OPTPROFILE
-    ""
-    CACHE STRING "Flags used for linking binaries during optimized profile builds."
-    FORCE )
-set(CMAKE_SHARED_LINKER_FLAGS_OPTPROFILE
-    ""
-    CACHE STRING "Flags used by the shared libraries linker during optimized profile builds."
-    FORCE )
-mark_as_advanced(
-    CMAKE_CXX_FLAGS_OPTPROFILE
-    CMAKE_C_FLAGS_OPTPROFILE
-    CMAKE_EXE_LINKER_FLAGS_OPTPROFILE
-    CMAKE_SHARED_LINKER_FLAGS_OPTPROFILE )
+# --- Build Types Configuration ---
+
+# Debug flags
+target_compile_options(jit_jss_core PUBLIC $<$<CONFIG:Debug>:-g -ggdb>)
+
+# Release flags
+target_compile_options(jit_jss_core PUBLIC $<$<CONFIG:Release>:-O3 -march=native -mtune=native>)
