@@ -15,5 +15,7 @@ out/
 build
 release
 debug
+Debug
+Release
 .vscode/settings.json
 results
